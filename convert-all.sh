@@ -1,0 +1,5 @@
+#/usr/bin/env bash
+find * -type d -not -path "rkt*" -exec mkdir -p rkt/{} \;
+for f in $(git ls-files | grep ".ttl");
+do echo -e ${f} "rkt/$(echo ${f} | sed 's/\.ttl/.rkt/')";
+done | xargs -L 1 -P 8 ttl-to-rkt

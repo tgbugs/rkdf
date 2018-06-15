@@ -1,0 +1,29 @@
+* rkdf
+  RDF parsers implemented as Racket languages
+
+* Warning
+  This code is extremely broken.
+
+* Requirements
+  =#lang rdf/turtle= and =#lang rdf/nt= use brag as a parser generator.
+  =ttl-to-rkt.sh= depends on librdf and rapper for fast parsing and conversion.
+  
+* Usage
+  The fastest way to get RDF representations into Racket is to use =convert-all.sh=.
+  The process is in no way robust and may fail silently. Once the conversion to rkt
+  is complete =raco make= is used to compile the outputs to speed up loading by a few
+  orders of magnitude.
+
+* Parsing is slow!
+  Running =raco make my-file.ttl= will make all future loads stupidly fast.
+  A faster parser would be preferred, but no time to implement that at the moment.
+  The BNF used for the turtle parser was a copy/paste fixup job from the turtle spec
+  and is not well written or optimized in the slightest.
+
+* Racket doesn't recognize my turtle files!
+  Conveniently turtle comments allow us to include
+  =#lang rdf/turtle= in the first line of a turtle file.
+  
+* The real solution
+  https://bitbucket.org/nxg/racket-librdf is probably the correct solution,
+  but is more complicated to install.

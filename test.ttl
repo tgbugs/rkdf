@@ -1,0 +1,48 @@
+#lang rdf/turtle
+@prefix hello: <http://there.general/> .
+@prefix rdf: <http://lolw3c.com/rdf/> .
+@prefix rdfs: <http://lolw3c.com/rdfs/> .
+@prefix owl: <http://lolw3c.com/owl/> .
+@prefix a: <http://a.com/> .
+@prefix predicate: <predicate> .
+# FIXME
+@prefix full: <http://there.general/kenobi> .
+@base <http://are-you-kidding-me> .
+
+:thing1 a :thing2 .
+
+a:subject predicate: a:object .
+
+a:subject <predicate> <object> .
+
+a:ont a owl:Ontology .  # fixed
+a:ont2 rdf:type owl:Ontology .
+
+a:subject a (true false), "wewlad";
+a:predicate "thing1", "thing2" ;
+predicate: "thing"^^xsd:string .
+
+
+a:class rdf:type owl:Class ;
+<predicate> """asdf"""@en .
+
+a:test a:p "Label2", "label2" , "one should come?", "Two should come?", 2, 1, false, true, 1.1, 0.01, 1e10, 1e0, 1.0, 1.00, "2", "1", "1.000", "2014-04-14T00:00:00-08:00"^^xsd:dateTime, "2014-04-14T00:00:00"^^xsd:dateTime .
+
+[] a "where am i kids" .
+
+@prefix more: <is this allowed?> .
+
+more: more: "more" .
+
+[] a owl:Class ;
+rdfs:subClassOf [ a owl:Restriction ;
+                  owl:onProperty a:pred ;
+                  owl:someValuesFrom a:class] .
+
+[] <thing>
+    """<tag>some text</tag>
+ <something-else>another tag</something-else>
+    """^^rdf:XMLLiteral .
+
+# TODO
+# _:4043228029908bbb46db61fe1f6278ae a _:a461c2e8fca2c74677db1c052ca91c34 .
