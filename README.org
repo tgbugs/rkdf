@@ -1,29 +1,62 @@
+#+TITLE: rkdf README
 * rkdf
   RDF parsers implemented as Racket languages
 * Warning
   This code is extremely broken.
 * Install
 ** Requirements
-   =#lang rdf/turtle= and =#lang rdf/nt= use brag as a parser generator.
-   =ttl-to-rkt.sh= depends on librdf and rapper for fast parsing and conversion.
+   =#lang rdf/turtle= and =#lang rdf/nt= use brag as a parser generator. \\
+   =ttl-to-rkt= depends on librdf and rapper for fast parsing and conversion.
+** Scripts
+   Run these or the equivalent for your setup if you want to use
+   =ttl-to-rkt= or =convert-all=.
+   #+BEGIN_SRC bash
+     ln -s $(realpath ttl-to-rkt.sh) ~/bin/ttl-to-rkt
+     ln -s $(realpath convert-all.sh) ~/bin/convert-all
+   #+END_SRC
 ** Development
    #+BEGIN_SRC bash
-   cd rkdf-lib && raco pkg install && cd .. &&
-   cd rkdf && raco pkg install && cd ..
+     cd rkdf-lib && raco pkg install && cd .. &&
+     cd rkdf && raco pkg install && cd ..
    #+END_SRC
 * Usage
-  The fastest way to get RDF representations into Racket is to use =convert-all.sh=.
-  The process is in no way robust and may fail silently. Once the conversion to rkt
-  is complete =raco make= is used to compile the outputs to speed up loading by a few
-  orders of magnitude.
+** As a =#lang=
+   Conveniently turtle comments allow us to include =#lang rdf/turtle=
+   in the first line of a turtle file. This is also true for nt, which will
+   accept the =#lang rdf/nt= line. =#lang rdf= defaults to turtle syntax.
+** Converting a single file
+   To convert a single file run the following
+   #+BEGIN_SRC bash
+     ttl-to-rkt my-ontology-file.ttl my-ontology-file.rkt
+   #+END_SRC
+   =ttl-to-rkt= runs =raco make= automatically so if you
+   are converting a large file it may take some time.
+   
+   =rapper= supports many formats besides turtle, an they could be
+   included with minimal changes to =ttl-to-rkt=.
+** Converting files in git
+   The fastest way to convert RDF representations store in git into Racket is to use
+   =convert-all=. The process is in no way robust and may fail silently. Once the
+   conversion to rkt is complete =raco make= is used to compile the outputs to speed
+   up loading by a few orders of magnitude. Note that =convert-all= will exactly
+   duplicate the file hierarchy of the original repository inside the =rkt/= folder.
+  
+   To make files available as racket modules do the following
+   #+BEGIN_SRC bash
+     cd path/to/my/ontology
+     raco pkg install
+     convert-all
+   #+END_SRC
+   It should then be possible require a single file using normal Racket =require= syntax.
+   #+BEGIN_SRC racket
+     #lang racket/base
+     (require ontology/rkt/my-ontology-file)
+   #+END_SRC
 * Parsing is slow!
   Running =raco make my-file.ttl= will make all future loads stupidly fast.
   A faster parser would be preferred, but no time to implement that at the moment.
   The BNF used for the turtle parser was a copy/paste fixup job from the turtle spec
   and is not well written or optimized in the slightest.
-* Racket doesn't recognize my turtle files!
-  Conveniently turtle comments allow us to include
-  =#lang rdf/turtle= in the first line of a turtle file.
 * The real solution
   https://bitbucket.org/nxg/racket-librdf is probably the correct solution,
   but is more complicated to install.
