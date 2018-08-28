@@ -16,7 +16,9 @@
          (struct-out BNode)
          (struct-out URI))
 (module+ test
-  (require rackunit (for-syntax rackunit)))
+  (require rackunit
+           racket/function
+           (for-syntax rackunit)))
 
 (define (bracket uri)
   (string-append "<" uri ">"))
@@ -272,20 +274,29 @@
      #:with (normalized-fstring ...) (map add-~a-suffix (syntax->list #'((~? fstring "") ...)))
      ; can't use filter since the number of ... must match :/
      #:with ((iri-prefix iri-suffix) ...) (map split-fstring (syntax->list #'((~? fstring function) ...)))
-     #'(begin (define (prefix-colon [id ""])
-                ; TODO allow suffixes to be provided as a symbol pointing to a list
-                (~? (let ([suffixes (list (symbol->string 'suffix) ...)])
-                      (unless (member (format "~a" id) suffixes)
-                        ; FIXME hard to give good error source loc
-                        ; we might want an argument error?
-                        (raise-argument-error 'closed-namespace
-                                              (format "one of:\n  ~a"
-                                                      (string-join suffixes "\n  "))
-                                              id))))
-                (~? (function id) (format normalized-fstring id))) ...
-              ; NOTE we are assuming that all prefixes are unique
-              ; FIXME does this overwrite or no?
-              (hash-union! (iri-prefixes) (hash (~@ iri-prefix 'prefix-colon) ...))
+     #'(begin
+         (define-syntax (prefix-colon stx)
+           (syntax-parse stx
+             [(_ (~optional id #:defaults ([id #'""])))
+              ; TODO allow suffixes to be provided as a symbol pointing to a list
+              #'(begin
+                  (~? (let ([suffixes (list (symbol->string 'suffix) ...)])
+                        (unless (member (format "~a" id) suffixes)
+                          ; FIXME hard to give good error source loc
+                          ; we might want an argument error?
+                          (raise-syntax-error 'closed-namespace
+                                              "suffix not in namespaces"
+                                              'prefix-colon
+                                              #'id))))
+                  (~? (function id) (format normalized-fstring id))
+                  )
+
+              ]
+             )
+           ) ...
+         ; NOTE we are assuming that all prefixes are unique
+         ; FIXME does this overwrite or no?
+         (hash-union! (iri-prefixes) (hash (~@ iri-prefix 'prefix-colon) ...))
               )]))
 
 ; TODO closed namespaces
@@ -344,10 +355,10 @@
     [open "http://open.org/"]
     [closed "http://closed.pool/" (the is)])
 
-  (closed: 'the)
-  (closed: 'is)
-  (closed: 'due)
-  (closed: 'to)
+  (check-false (not (closed: 'the)))
+  (check-false (not (closed: 'is)))
+  (check-exn exn:fail:syntax? (thunk (closed: 'due)))
+  (check-exn exn:fail:syntax? (thunk (closed: 'to)))
 
   )
 
@@ -377,7 +388,7 @@
   (syntax-parse stx
     [(_ . identifier:id)
      (if (identifier-binding #'identifier)
-         #'(#%top . identifier)
+         #'(#%top . identifier)  ; FIXME not sure if this is actually the issue, but bare prefix: errors ...
          (let ([id (symbol->string (syntax-e #'identifier))])
            (if (string-contains? id ":")
                (let* ([prefix-suffix (string-split id ":")]
@@ -385,16 +396,30 @@
                       [prefix-colon (format-id #'identifier #:source #'identifier
                                                "~a:" (datum->syntax #f (string->symbol prefix)))])
                  (if (identifier-binding prefix-colon)
-                     #`(#,prefix-colon #,(cadr prefix-suffix))
+                     (let ([suffix (cadr prefix-suffix)])
+                       (datum->syntax #'identifier (if (non-empty-string? suffix)
+                                                       (list prefix-colon suffix)
+                                                       (list prefix-colon))
+                                      #'identifier
+                                      #'identifier))
                      ; FIXME figure out how to reorder if statements for a single base case
                      #'(#%top . identifier)
                      ))
                #'(#%top . identifier))))]))
 
 (module+ test
-  (define (rdf: value)
-    (format "rdf-prefix#~a" value))
+  (define-syntax (rdf: stx)
+    (syntax-parse stx
+      [(_ (~optional value))
+       #'(~? (format "rdf-prefix#~a" value)
+             "rdf-prefix#")]))
 
   (check-equal? (rdf-top . rdf:type) "rdf-prefix#type")
+
+  #; ; can't test this in here
+  (check-equal? (#%top . rdf:) "rdf-prefix#")
+  #; ; can't test this in here
+  (check-equal? (rdf-top . rdf:) "rdf-prefix#")
+
   (define hello 123)
   (check-equal? (rdf-top . hello) 123))
