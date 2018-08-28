@@ -204,11 +204,16 @@
 
 (define-for-syntax (split-fstring fstring-stx)
   (let ([fstring (syntax-e fstring-stx)])
-    (if (string-contains? fstring "~a")
-        (syntax->list (datum->syntax fstring-stx (string-split fstring "~a" #:trim? #f)
-                                     fstring-stx
-                                     fstring-stx))
-        (list fstring-stx (syntax/loc fstring-stx "")))))
+    (if (string? fstring)
+        (if (string-contains? fstring "~a")
+            (syntax->list (datum->syntax fstring-stx (string-split fstring "~a" #:trim? #f)
+                                         fstring-stx
+                                         fstring-stx))
+            (list fstring-stx (syntax/loc fstring-stx "")))
+        (split-fstring (datum->syntax fstring-stx (eval-syntax #`(#,fstring-stx "~a"))
+                                      ; I'm actually amusingly proud of this solution ...
+                                      fstring-stx
+                                      fstring-stx)))))
 
 (module+ test
   (begin-for-syntax
@@ -218,8 +223,6 @@
                   '("thing end" ""))
     (check-equal? (map syntax->datum (split-fstring #'"no thing"))
                   '("no thing" ""))))
-
-(define inverse-lu (make-hash))
 
 (define (qname iri)
   ; TODO if rdf-top is in use skip the (prefix: suffix) and -> prefix:suffix
@@ -239,18 +242,47 @@
                  (list func))))])
     (if out out iri)))
 
+(define-for-syntax (suffix-conv stx)
+  (let ([value (syntax-e stx)])
+    ;(println value)
+    (if value
+        (datum->syntax stx (format "~a" value) stx stx)
+        #f
+        )))
+
+(define-for-syntax (suffix-t dat)
+  ;(println (list 'dat dat))
+  (if (null? dat)
+      #'(void)
+      #`(unless (member id '#,dat)
+          (raise-syntax-error 'closed-namespace
+                              (format "~a is not a member of ~a" id '#,dat)
+                              ))))
+
+(require (for-syntax protc/private/utils))
 (define-syntax (define-id-funcs stx)
   ; FIXME define-prefixes define-iri-prefixes is the simple case
   ; but we can allow this to be much more complex including (complex: id-part-1 id-part-2 ... id-part-n)
+  ; FIXME if it is a function then we also need to be given the inverse function
   (syntax-parse stx
-    [(_ [prefix:id (~or* fstring:str function:expr)] ...)
+    [(_ [prefix:id (~or* fstring:str function:expr) (~optional (suffix ...))] ...)
      #:with (prefix-colon ...) (map (λ (p) (format-id p #:source p "~a:" (syntax-e p)))
                                     (syntax->list #'(prefix ...)))
      ;#:with (sfunc ...) (map format-or-string-append (syntax->datum #'(fstring ...)))
-     #:with (normalized-fstring ...) (map add-~a-suffix (syntax->list #'(fstring ...)))
-     #:with ((iri-prefix iri-suffix) ...) (map split-fstring (syntax->list #'(fstring ...)))
+     #:with (normalized-fstring ...) (map add-~a-suffix (syntax->list #'((~? fstring "") ...)))
+     ; can't use filter since the number of ... must match :/
+     #:with ((iri-prefix iri-suffix) ...) (map split-fstring (syntax->list #'((~? fstring function) ...)))
      #'(begin (define (prefix-colon [id ""])
-                (~? function (format normalized-fstring id))) ...
+                ; TODO allow suffixes to be provided as a symbol pointing to a list
+                (~? (let ([suffixes (list (symbol->string 'suffix) ...)])
+                      (unless (member (format "~a" id) suffixes)
+                        ; FIXME hard to give good error source loc
+                        ; we might want an argument error?
+                        (raise-argument-error 'closed-namespace
+                                              (format "one of:\n  ~a"
+                                                      (string-join suffixes "\n  "))
+                                              id))))
+                (~? (function id) (format normalized-fstring id))) ...
               ; NOTE we are assuming that all prefixes are unique
               ; FIXME does this overwrite or no?
               (hash-union! (iri-prefixes) (hash (~@ iri-prefix 'prefix-colon) ...))
@@ -263,10 +295,27 @@
     [a "test"]
     [b "another ~a test"]
     [c "hello"]
+    [woah (λ (id) "this is a constant namespace!")]
+    [dude (λ (id) (string-append "if this works i "
+                                 (format "~a" id)
+                                 ;(format "~a" id)  ; adding this line causes the parse to fail!??!
+                                 (format "~a" '-its-a-number!)
+                                 " will eat my hat"))]
     )
   (check-equal? (a: "thing") "testthing")
   (check-equal? (b: 'another-thing) "another another-thing test")
   (check-equal? (c: 199291) "hello199291")
+
+  (check-equal? (woah: 1) "this is a constant namespace!")
+  (check-equal? (woah: 'a) "this is a constant namespace!")
+  (check-equal? (woah: "") "this is a constant namespace!")
+
+  (check-equal? (dude: 1) "if this works i 1-its-a-number! will eat my hat")
+  (check-equal? (dude: 2) "if this works i 2-its-a-number! will eat my hat")
+  (check-equal? (dude: 3) "if this works i 3-its-a-number! will eat my hat")
+  (check-equal? (qname "if this works i 3-its-a-number! will eat my hat")
+                ; FIXME deal with the suffixes
+                '(dude: "3-its-a-number! will eat my hat"))
 
   (define-id-funcs
     [d "hrm"])
@@ -289,6 +338,17 @@
     [y "x/y/"])
   (check-equal? (gen-short (URI "x/y/longer")) '(y: "longer"))
   (check-equal? (gen-short (URI "x/shorter")) '(x: "shorter"))
+
+  (define-id-funcs
+    ; FIXME something other than ids for suffixes?
+    [open "http://open.org/"]
+    [closed "http://closed.pool/" (the is)])
+
+  (closed: 'the)
+  (closed: 'is)
+  (closed: 'due)
+  (closed: 'to)
+
   )
 
 ;;; rdf #%top
