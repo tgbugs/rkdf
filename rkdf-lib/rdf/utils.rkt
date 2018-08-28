@@ -288,12 +288,9 @@
                                               "suffix not in namespaces"
                                               'prefix-colon
                                               #'id))))
-                  (~? (function id) (format normalized-fstring id))
-                  )
-
-              ]
-             )
-           ) ...
+                  (~? (function id) (format normalized-fstring id)))]
+             ; empty suffix case for rdf-top
+             [_ #'(~? (function "") (format normalized-fstring ""))])) ...
          ; NOTE we are assuming that all prefixes are unique
          ; FIXME does this overwrite or no?
          (hash-union! (iri-prefixes) (hash (~@ iri-prefix 'prefix-colon) ...))
@@ -313,6 +310,7 @@
                                  (format "~a" '-its-a-number!)
                                  " will eat my hat"))]
     )
+  (check-equal? a: "test")
   (check-equal? (a: "thing") "testthing")
   (check-equal? (b: 'another-thing) "another another-thing test")
   (check-equal? (c: 199291) "hello199291")
@@ -385,10 +383,11 @@
      #'(~? prefix-suffix-stx (#%top . identifier))]))
 
 (define-syntax (rdf-top stx)
+  ; bare interaction issue is because the prefixes are defined as macros
   (syntax-parse stx
     [(_ . identifier:id)
      (if (identifier-binding #'identifier)
-         #'(#%top . identifier)  ; FIXME not sure if this is actually the issue, but bare prefix: errors ...
+         #'(#%top . identifier)
          (let ([id (symbol->string (syntax-e #'identifier))])
            (if (string-contains? id ":")
                (let* ([prefix-suffix (string-split id ":")]
@@ -407,14 +406,20 @@
                      ))
                #'(#%top . identifier))))]))
 
-(module+ test
-  (define-syntax (rdf: stx)
-    (syntax-parse stx
-      [(_ (~optional value))
-       #'(~? (format "rdf-prefix#~a" value)
-             "rdf-prefix#")]))
+#; ; use to debug rdf-top via #lang s-exp "utils.rkt"
+(provide (rename-out [rdf-top #%top])
+         #%module-begin
+         #%datum
+         rdf:)
 
+(module+ test
+  (define-id-funcs [rdf "rdf-prefix#"])
   (check-equal? (rdf-top . rdf:type) "rdf-prefix#type")
+
+  (check-equal? (rdf: "thing") "rdf-prefix#thing")
+  (check-equal? rdf: "rdf-prefix#")
+  (check-equal? (rdf:) "rdf-prefix#")
+  (check-equal? (rdf: "") "rdf-prefix#")
 
   #; ; can't test this in here
   (check-equal? (#%top . rdf:) "rdf-prefix#")
