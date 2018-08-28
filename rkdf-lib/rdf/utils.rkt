@@ -3,6 +3,9 @@
          racket/list
          racket/hash
          racket/string
+         racket/stream
+         (only-in racket/dict in-dict)
+         (only-in racket/sequence sequence->list)
          (for-syntax racket/base
                      racket/string
                      racket/syntax
@@ -81,7 +84,7 @@
   (define (add-triples triples)
     (set! int-triples (append triples int-triples)))
 
-  (define-syntax (null?-or-equal? stx) 
+  (define-syntax (null?-or-equal? stx)
     (syntax-parse stx
       [(_ nullable to-match)
        #'(or (null? nullable) (equal? nullable to-match))]))
@@ -189,7 +192,7 @@
     (check-equal?
      (syntax->datum (format-or-string-append "should be string-append"))
      'string-append)
-    (check-equal? 
+    (check-equal?
      (syntax->datum (format-or-string-append "should be format ~a"))
      'format)))
 
@@ -219,20 +222,26 @@
 (define inverse-lu (make-hash))
 
 (define (qname iri)
+  ; TODO if rdf-top is in use skip the (prefix: suffix) and -> prefix:suffix
   ; TODO trie
-  ; FIXME longest prefix first.
-  (for/fold ([out #f]  ; for/fold seems like the wrong tool for the job here
-             #:result (if out out iri))
-            ([(pref func) (in-hash (iri-prefixes))]
-             #:when (string-prefix? iri pref)
-             #:final (string-prefix? iri pref))
-    (let* ([maybe-suffix (string-trim iri pref)]
-           [out maybe-suffix]   ; TODO need the suffixes too
-           )
-      (if (non-empty-string? out) (list func out)
-          (list func)))))
+  (let ([out
+         (for/first
+             ([(pref func) (in-dict (sort (sequence->list (in-hash-pairs (iri-prefixes)))
+                                          ; note that we use > here so that we don't have
+                                          ; to call (reverse x)
+                                          (λ (a b) (> (string-length a) (string-length b)))
+                                          #:key car))]
+              #:when (string-prefix? iri pref))
+           (let* ([maybe-suffix (string-trim iri pref)]
+                  [out maybe-suffix]   ; TODO need the suffixes too
+                  )
+             (if (non-empty-string? out) (list func out)
+                 (list func))))])
+    (if out out iri)))
 
 (define-syntax (define-id-funcs stx)
+  ; FIXME define-prefixes define-iri-prefixes is the simple case
+  ; but we can allow this to be much more complex including (complex: id-part-1 id-part-2 ... id-part-n)
   (syntax-parse stx
     [(_ [prefix:id (~or* fstring:str function:expr)] ...)
      #:with (prefix-colon ...) (map (λ (p) (format-id p #:source p "~a:" (syntax-e p)))
@@ -266,12 +275,66 @@
 
   (check-equal? (qname "hrmhello") '(d: "hello"))
 
-  (qname "test")
-  (a:)
+  (check-equal? (qname "test") '(a:))
+  (check-equal? (a:) "test")
   (parameterize ([iri-prefixes (make-hash)])
     (define-id-funcs [d "not-hrm/"])
-    (qname "test")
-    (qname "not-hrm/thing"))
+    (check-equal? (qname "test") "test")
+    (check-equal? (qname "not-hrm/thing") '(d: "thing")))
 
-  (gen-short (URI "testsuffix"))
+  (check-equal? (gen-short (URI "testsuffix")) '(a: "suffix"))
+
+  (define-id-funcs
+    [x "x/"]
+    [y "x/y/"])
+  (check-equal? (gen-short (URI "x/y/longer")) '(y: "longer"))
+  (check-equal? (gen-short (URI "x/shorter")) '(x: "shorter"))
   )
+
+;;; rdf #%top
+
+#; ; i think these should be almost exactly equivalent
+(define-syntax (rdf-top stx)
+  (syntax-parse stx
+    [(_ . identifier:id)
+     ; reminder that code here is 'free' at runtime becuase it goes at compile time
+     #:attr prefix-suffix-stx
+     (if (identifier-binding #'identifier)
+         #f  ; if the identifier is bound it takes priority
+         (let ([id (symbol->string (syntax-e #'identifier))])
+           (if (string-contains? id ":")
+               (let* ([prefix-suffix (string-split id ":")]
+                      [prefix (car prefix-suffix)]
+                      [prefix-colon (format-id #'identifier #:source #'identifier
+                                               "~a:" (datum->syntax #f (string->symbol prefix)))])
+                 (if (identifier-binding (datum->syntax this-syntax prefix-colon))
+                     #`(#,prefix-colon #,(cadr prefix-suffix))
+                     #f))
+               #f)))
+     #'(~? prefix-suffix-stx (#%top . identifier))]))
+
+(define-syntax (rdf-top stx)
+  (syntax-parse stx
+    [(_ . identifier:id)
+     (if (identifier-binding #'identifier)
+         #'(#%top . identifier)
+         (let ([id (symbol->string (syntax-e #'identifier))])
+           (if (string-contains? id ":")
+               (let* ([prefix-suffix (string-split id ":")]
+                      [prefix (car prefix-suffix)]
+                      [prefix-colon (format-id #'identifier #:source #'identifier
+                                               "~a:" (datum->syntax #f (string->symbol prefix)))])
+                 (if (identifier-binding prefix-colon)
+                     #`(#,prefix-colon #,(cadr prefix-suffix))
+                     ; FIXME figure out how to reorder if statements for a single base case
+                     #'(#%top . identifier)
+                     ))
+               #'(#%top . identifier))))]))
+
+(module+ test
+  (define (rdf: value)
+    (format "rdf-prefix#~a" value))
+
+  (check-equal? (rdf-top . rdf:type) "rdf-prefix#type")
+  (define hello 123)
+  (check-equal? (rdf-top . hello) 123))
