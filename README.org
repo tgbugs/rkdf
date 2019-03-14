@@ -9,15 +9,14 @@
    =ttl-to-rkt= depends on librdf and rapper for fast parsing and conversion.
 ** Scripts
    Run these or the equivalent for your setup if you want to use
-   =ttl-to-rkt= or =convert-all=.
-   #+BEGIN_SRC bash
-     ln -s $(realpath ttl-to-rkt.sh) ~/bin/ttl-to-rkt
-     ln -s $(realpath convert-all.sh) ~/bin/convert-all
+   =ttl-to-rkt= or =rkdf-convert-all=.
+   #+BEGIN_SRC bash :results output
+     ln -s $(realpath ./bin/ttl-to-rkt) ~/bin/ttl-to-rkt
+     ln -s $(realpath ./bin/rkdf-convert-all) ~/bin/rkdf-convert-all
    #+END_SRC
 ** Development
-   #+BEGIN_SRC bash
-     cd rkdf-lib && raco pkg install && cd .. &&
-     cd rkdf && raco pkg install && cd ..
+   #+BEGIN_SRC bash :results output
+     raco pkg install rkdf-lib/ rkdf/
    #+END_SRC
 * Usage
 ** As a =#lang=
@@ -36,16 +35,16 @@
    included with minimal changes to =ttl-to-rkt=.
 ** Converting files in git
    The fastest way to convert RDF representations store in git into Racket is to use
-   =convert-all=. The process is in no way robust and may fail silently. Once the
+   =rkdf-convert-all=. The process is in no way robust and may fail silently. Once the
    conversion to rkt is complete =raco make= is used to compile the outputs to speed
    up loading by a few orders of magnitude. Note that =convert-all= will exactly
    duplicate the file hierarchy of the original repository inside the =rkt/= folder.
   
    To make files available as racket modules do the following
    #+BEGIN_SRC bash
+     raco pkg install path/to/my/ontology/
      cd path/to/my/ontology
-     raco pkg install
-     convert-all
+     rkdf-convert-all
    #+END_SRC
    It should then be possible require a single file using normal Racket =require= syntax.
    #+BEGIN_SRC racket
