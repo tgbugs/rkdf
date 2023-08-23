@@ -261,7 +261,6 @@
                               (format "~a is not a member of ~a" id '#,dat)
                               ))))
 
-(require (for-syntax protc/private/utils))
 (define-syntax (define-id-funcs stx)
   ; FIXME define-prefixes define-iri-prefixes is the simple case
   ; but we can allow this to be much more complex including (complex: id-part-1 id-part-2 ... id-part-n)
