@@ -3,5 +3,6 @@
 (define collection 'multi)
 
 (define deps '("base"
-               "brag"))
+               "brag"
+               "debug"))
 (define build-deps '())
