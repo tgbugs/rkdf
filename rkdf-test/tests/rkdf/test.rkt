@@ -16,7 +16,6 @@
          ;"../../../../../../tmp/test.ttl"
          ;(rename-in "../../../../../../tmp/NIF-Molecule.rkt" [store mol-store])
          ;(rename-in "../../../../../../tmp/scicrunch-registry.rkt" [store scr-store])
-         NIF-Ontology/rkt/scicrunch-registry
          )
 
 
@@ -47,19 +46,48 @@
     ;)
     (display " .\n" out-port)))
 
-(define (make-nt out-port)
-  ;(displayln "#lang rdf/nt" out-port)
-  (for ([triple store]) (ser triple out-port)))
+(module+ needs-nif-ontology
+  #;
+  (require NIF-Ontology/rkt/scicrunch-registry)
+  (define-id-funcs
+    [ilxtr "http://uri.interlex.org/tgbugs/uris/readable/"]
+    [owl "http://www.w3.org/2002/07/owl#"]
+    [rdf "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+         (type)]
+    [rdfs "http://www.w3.org/2000/01/rdf-schema#"])
+  (define store
+    (list
+     (triple (URI (ilxtr: 'thing-0)) (URI (rdf: 'type)) (URI (owl: 'Thing)))
+     (triple (URI (ilxtr: 'thing-1)) (URI (rdf: 'type)) (URI (owl: 'Thing)))
+     (triple (URI (ilxtr: 'thing-2)) (URI (rdf: 'type)) (URI (owl: 'Thing)))
+     (triple (URI (ilxtr: 'thing-3)) (URI (rdf: 'type)) (URI (owl: 'Thing)))
+     (triple (URI (ilxtr: 'thing-4)) (URI (rdf: 'type)) (URI (owl: 'Thing)))
+     (triple (URI (ilxtr: 'thing-5)) (URI (rdf: 'type)) (URI (owl: 'Thing)))
+     (triple (URI (ilxtr: 'thing-6)) (URI (rdf: 'type)) (URI (owl: 'Thing)))
+     (triple (URI (ilxtr: 'thing-7)) (URI (rdf: 'type)) (URI (owl: 'Thing)))
+     (triple (URI (ilxtr: 'thing-8)) (URI (rdf: 'type)) (URI (owl: 'Thing)))
+     (triple (URI (ilxtr: 'thing-9)) (URI (rdf: 'type)) (URI (owl: 'Thing)))
+     (triple (SCR: 000200) (URI (rdf: 'type)) (URI (owl: 'NamedIndividual)))
+     (triple (SCR: 010200) (URI (rdf: 'type)) (URI (owl: 'NamedIndividual)))
+     ))
+  (define (make-nt out-port)
+    ;(displayln "#lang rdf/nt" out-port)
+    (for ([triple store]) (ser triple out-port)))
 
-(define (things)
-  (for/list ([t store] #:when
-                       (eq? "<bbbbbbbb>" (if (list? (triple-s t))
-                                             #f
-                                             (gen-ser (triple-s t)))))
-    t)
+  (define (things)
+    (for/list ([t store] #:when
+                         (eq? "<bbbbbbbb>" (if (list? (triple-s t))
+                                               #f
+                                               (gen-ser (triple-s t)))))
+      t)
 
-  (for/list ([t store] #:when (URI? (triple-s t))) t)
-  )
+    (for/list ([t store] #:when (URI? (triple-s t))) t)
+    )
+
+  (take (filter (p-eq? rdf:type) store) 10)
+  (filter (s-eq? (SCR: 000200)) store)
+  (filter (s-eq? (SCR: 010200)) store)
+)
 
 (define (read-test)
   (read (current-input-port)))
@@ -104,10 +132,6 @@
 (define (s-eq? value) (λ (triple) (equal? (triple-s triple) value)))
 (define (p-eq? value) (λ (triple) (equal? (triple-p triple) value)))
 (define (o-eq? value) (λ (triple) (equal? (triple-o triple) value)))
-
-(take (filter (p-eq? rdf:type) store) 10)
-(filter (s-eq? (SCR: 000200)) store)
-(filter (s-eq? (SCR: 010200)) store)
 
 (define (-match #:s [s null] #:p [p null] #:o [o null])
   (void))
