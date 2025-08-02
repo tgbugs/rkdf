@@ -4,7 +4,8 @@
 
 (define deps
   '("base"
-    "rkdf-lib"
-    "rackunit-lib"))
-(define build-deps
-'())
+    "rkdf-lib"))
+
+(define build-deps '())
+
+(define license 'MIT)

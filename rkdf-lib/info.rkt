@@ -4,5 +4,9 @@
 
 (define deps '("base"
                "brag"
-               "debug"))
+               "debug"
+               "rackunit-lib"))
+
 (define build-deps '())
+
+(define license 'MIT)

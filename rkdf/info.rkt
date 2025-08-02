@@ -7,3 +7,5 @@
 (define build-deps '())
 
 (define implies deps)
+
+(define license 'MIT)
